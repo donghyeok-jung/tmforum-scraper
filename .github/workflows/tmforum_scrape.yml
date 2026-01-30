@@ -31,14 +31,22 @@ jobs:
       - name: Run scraper
         run: python scraper/scrape_tmforum.py
 
-      - name: Commit & push if changed
+      - name: Commit & push (latest csv)
         run: |
-          if git diff --quiet; then
+          # 1) 파일이 실제로 생성됐는지 로그로 확인
+          ls -al data || true
+          test -f data/tmforum_an_validations_latest.csv && echo "CSV exists" || (echo "CSV missing" && exit 1)
+
+          # 2) 새 파일(untracked)도 포함해서 stage
+          git add data/tmforum_an_validations_latest.csv
+
+          # 3) 추적/미추적 포함 변경 여부 확인
+          if [ -z "$(git status --porcelain)" ]; then
             echo "No changes."
             exit 0
           fi
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/tmforum_an_validations_latest.csv
           git commit -m "chore: update latest scrape"
           git push
