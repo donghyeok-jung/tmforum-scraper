@@ -1,4 +1,4 @@
-name: tmforum daily scrape (latest only + email on change)
+name: tmforum daily scrape (latest only + Teams DM on change)
 
 on:
   schedule:
@@ -19,57 +19,4 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-          cache: "pip"
-          cache-dependency-path: "requirements.txt"
-
-      - name: Install deps
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Install Playwright browsers
-        run: python -m playwright install --with-deps chromium
-
-      - name: Run scraper
-        id: scrape
-        run: python scraper/scrape_tmforum.py
-
-      - name: Send email (only when changed)
-        if: steps.scrape.outputs.changed == 'true'
-        uses: dawidd6/action-send-mail@v3.7.2
-        with:
-          server_address: ${{ secrets.SMTP_SERVER }}
-          server_port: ${{ secrets.SMTP_PORT }}
-          secure: false
-
-          username: ${{ secrets.SMTP_USERNAME }}
-          password: ${{ secrets.SMTP_PASSWORD }}
-
-          to: ${{ secrets.MAIL_TO }}
-          from: ${{ secrets.MAIL_FROM }}
-          subject: "[TM Forum] AN validations 변경 감지 (${{ steps.scrape.outputs.ts_kst }})"
-          body: |
-            변경이 감지되어 최신 CSV를 첨부합니다.
-            최신값(col1~col6): ${{ steps.scrape.outputs.summary }}
-          attachments: data/tmforum_an_validations_latest.csv
-
-      - name: Commit & push (latest csv)
-        run: |
-          # 파일 존재 확인(문제 발생 시 로그로 바로 보이게)
-          ls -al data || true
-          test -f data/tmforum_an_validations_latest.csv && echo "CSV exists" || (echo "CSV missing" && exit 1)
-
-          # 새 파일/변경 모두 stage
-          git add -A
-
-          # 변경 없으면 종료
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "No changes."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: update latest scrape"
-          git push
+          python-version:
