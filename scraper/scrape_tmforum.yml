@@ -1,0 +1,25 @@
+      - name: Notify me on Teams DM (only when changed)
+        if: steps.scrape.outputs.changed == 'true'
+        env:
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          TS_KST: ${{ steps.scrape.outputs.ts_kst }}
+          SUMMARY: ${{ steps.scrape.outputs.summary }}
+        run: |
+          python - <<'PY'
+          import os, json, urllib.request
+
+          url = os.environ["TEAMS_WEBHOOK_URL"]
+          ts = os.environ["TS_KST"]
+          summary = os.environ["SUMMARY"]
+
+          payload = {"text": f"[TM Forum] 변경 감지 ({ts})\n{summary}"}
+
+          req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+          )
+          with urllib.request.urlopen(req, timeout=30) as resp:
+            print("Teams webhook status:", resp.status)
+          PY
