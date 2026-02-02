@@ -1,8 +1,8 @@
-name: tmforum daily scrape (latest only)
+name: tmforum daily scrape (latest only + email on change)
 
 on:
   schedule:
-    - cron: "7 0 * * *"   # 매일 09:07 KST (UTC 00:07)
+    - cron: "0 0 * * *"   # 매일 09:00 KST (UTC 00:00)
   workflow_dispatch: {}
 
 permissions:
@@ -11,6 +11,7 @@ permissions:
 jobs:
   scrape:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,12 +20,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "requirements.txt"
 
       - name: Install deps
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-          
+
       - name: Install Playwright browsers
         run: python -m playwright install --with-deps chromium
 
@@ -53,14 +56,14 @@ jobs:
 
       - name: Commit & push (latest csv)
         run: |
-          # 1) 파일이 실제로 생성됐는지 로그로 확인
+          # 파일 존재 확인(문제 발생 시 로그로 바로 보이게)
           ls -al data || true
           test -f data/tmforum_an_validations_latest.csv && echo "CSV exists" || (echo "CSV missing" && exit 1)
 
-          # 2) 새 파일(untracked)도 포함해서 stage
-          git add data/tmforum_an_validations_latest.csv
+          # 새 파일/변경 모두 stage
+          git add -A
 
-          # 3) 추적/미추적 포함 변경 여부 확인
+          # 변경 없으면 종료
           if [ -z "$(git status --porcelain)" ]; then
             echo "No changes."
             exit 0
