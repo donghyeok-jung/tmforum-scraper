@@ -29,7 +29,27 @@ jobs:
         run: python -m playwright install --with-deps chromium
 
       - name: Run scraper
+        id: scrape
         run: python scraper/scrape_tmforum.py
+
+      - name: Send email (only when changed)
+        if: steps.scrape.outputs.changed == 'true'
+        uses: dawidd6/action-send-mail@v3.7.2
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          secure: false
+
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+
+          to: ${{ secrets.MAIL_TO }}
+          from: ${{ secrets.MAIL_FROM }}
+          subject: "[TM Forum] AN validations 변경 감지 (${{ steps.scrape.outputs.ts_kst }})"
+          body: |
+            변경이 감지되어 최신 CSV를 첨부합니다.
+            최신값(col1~col6): ${{ steps.scrape.outputs.summary }}
+          attachments: data/tmforum_an_validations_latest.csv
 
       - name: Commit & push (latest csv)
         run: |
