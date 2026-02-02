@@ -2,7 +2,7 @@ name: tmforum daily scrape (latest only + Teams DM card on change)
 
 on:
   schedule:
-    - cron: "0 0 * * *"   # 매일 09:00 KST (UTC 00:00)
+    - cron: "0 23 * * *"   # 매일 08:00 KST (UTC 23:00)
   workflow_dispatch: {}
 
 permissions:
@@ -41,7 +41,7 @@ jobs:
           echo "ts_kst=${{ steps.scrape.outputs.ts_kst }}"
           echo "summary=${{ steps.scrape.outputs.summary }}"
 
-      - name: Notify me on Teams DM (only when changed, adaptive card attachment)
+      - name: Notify me on Teams DM (only when changed, adaptive card)
         if: steps.scrape.outputs.changed == 'true'
         env:
           TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
@@ -55,9 +55,16 @@ jobs:
           ts = os.environ.get("TS_KST", "")
           summary = os.environ.get("SUMMARY", "")
 
-          text = f"[TM Forum] 변경 감지 ({ts})\\n{summary}"
+          # summary는 "col1 | col2 | col3 | col4 | col5 | col6" 형태.
+          # col1이 비어있으면 nan이 들어올 수 있으니 col2~col6만 보여주도록 정리.
+          parts = [p.strip() for p in summary.split("|")]
+          if len(parts) >= 6:
+            item_line = " | ".join(parts[1:6])  # col2~col6
+          else:
+            item_line = summary
 
-          # Teams Workflows(웹훅 트리거)가 "첨부 파일 적응형 카드(attachments)"를 받는 구조에 맞춤
+          link = "https://www.tmforum.org/topics/an-resources/"
+
           payload = {
             "type": "message",
             "attachments": [
@@ -69,10 +76,30 @@ jobs:
                   "type": "AdaptiveCard",
                   "version": "1.5",
                   "body": [
-                    {"type": "TextBlock", "size": "Medium", "weight": "Bolder", "text": "TM Forum AN Validations 변경 감지"},
-                    {"type": "TextBlock", "text": f"시간(KST): {ts}", "wrap": True},
-                    {"type": "TextBlock", "text": "최신값(col1~col6):", "wrap": True},
-                    {"type": "TextBlock", "text": summary, "wrap": True}
+                    {
+                      "type": "TextBlock",
+                      "size": "Medium",
+                      "weight": "Bolder",
+                      "text": "TM Forum Validation 표에 신규 목록이 추가되었습니다.",
+                      "wrap": True
+                    },
+                    {
+                      "type": "TextBlock",
+                      "text": link,
+                      "wrap": True,
+                      "color": "Accent"
+                    },
+                    {
+                      "type": "TextBlock",
+                      "text": item_line,
+                      "wrap": True
+                    },
+                    {
+                      "type": "TextBlock",
+                      "text": f"(KST) {ts}",
+                      "isSubtle": True,
+                      "wrap": True
+                    }
                   ]
                 }
               }
