@@ -19,4 +19,66 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "requirements.txt"
+
+      - name: Install deps
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run scraper
+        id: scrape
+        run: python scraper/scrape_tmforum.py
+
+      - name: Show outputs
+        run: |
+          echo "changed=${{ steps.scrape.outputs.changed }}"
+          echo "ts_kst=${{ steps.scrape.outputs.ts_kst }}"
+          echo "summary=${{ steps.scrape.outputs.summary }}"
+
+      - name: Notify me on Teams DM (only when changed)
+        if: steps.scrape.outputs.changed == 'true'
+        env:
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          TS_KST: ${{ steps.scrape.outputs.ts_kst }}
+          SUMMARY: ${{ steps.scrape.outputs.summary }}
+        run: |
+          python - <<'PY'
+          import os, json, urllib.request
+
+          url = os.environ["TEAMS_WEBHOOK_URL"]
+          ts = os.environ.get("TS_KST", "")
+          summary = os.environ.get("SUMMARY", "")
+
+          payload = {"text": f"[TM Forum] 변경 감지 ({ts})\n{summary}"}
+
+          req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=30) as resp:
+            print("Teams webhook status:", resp.status)
+          PY
+
+      - name: Commit & push (latest csv)
+        run: |
+          ls -al data || true
+          test -f data/tmforum_an_validations_latest.csv && echo "CSV exists" || (echo "CSV missing" && exit 1)
+
+          git add -A
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No changes."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: update latest scrape"
+          git push
